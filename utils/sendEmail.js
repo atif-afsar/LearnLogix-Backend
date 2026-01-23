@@ -1,18 +1,19 @@
+
 import nodemailer from "nodemailer";
 
-export const sendEmail = async ({ name, email, program, message }) => {
-  if (!name || !email || !message) {
-    throw new Error("Missing required fields");
-  }
-
-  // Create transporter INSIDE function (safer for serverless)
+export const sendEmail = async () => {
   const transporter = nodemailer.createTransport({
     service: "gmail",
     auth: {
       user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS, // Gmail App Password
+      pass: process.env.EMAIL_PASS,
     },
   });
+
+  const result = await transporter.verify();
+  console.log("SMTP verify result:", result);
+};
+
 
   await transporter.sendMail({
     from: `"LearnLogix Contact" <${process.env.EMAIL_USER}>`,
@@ -34,4 +35,3 @@ export const sendEmail = async ({ name, email, program, message }) => {
       </div>
     `,
   });
-};
