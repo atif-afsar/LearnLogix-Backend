@@ -16,6 +16,14 @@ app.get("/", (req, res) => {
   res.send("Backend is running 🚀");
 });
 
+app.get("/env-check", (req, res) => {
+  res.json({
+    EMAIL_USER: process.env.EMAIL_USER || null,
+    EMAIL_PASS: process.env.EMAIL_PASS ? "SET" : null,
+  });
+});
+
+
 // CONTACT FORM ROUTE
 app.post("/api/contact", async (req, res) => {
   const { name, email, program, message } = req.body;
