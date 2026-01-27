@@ -7,6 +7,10 @@ const app = express();
 app.use(cors({ origin: "*" }));
 app.use(express.json());
 
+import adminRoutes from "./routes/admin.routes.js";
+
+app.use("/api/admin", adminRoutes);
+
 app.use("/api/contact", contactRoutes);
 
 app.get("/test", (req, res) => {
