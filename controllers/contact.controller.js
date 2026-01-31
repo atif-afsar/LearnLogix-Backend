@@ -13,7 +13,15 @@ export const sendContactMessage = async (req, res) => {
       });
     }
 
-    await resend.emails.send({
+    if (!process.env.RESEND_API_KEY) {
+      console.error("RESEND_API_KEY not set");
+      return res.status(500).json({
+        success: false,
+        message: "Email service not configured",
+      });
+    }
+
+    const result = await resend.emails.send({
       from: "LearnLogix <onboarding@resend.dev>",
       to: ["learnwithlogix@gmail.com"], // ✅ ALL emails go here
       replyTo: email,
@@ -26,6 +34,8 @@ export const sendContactMessage = async (req, res) => {
         <p>${message}</p>
       `,
     });
+
+    console.log("Email send result:", result);
 
     return res.status(200).json({
       success: true,
