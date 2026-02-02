@@ -3,9 +3,13 @@ import Course from "../models/Course.model.js";
 // Simple in-memory SSE clients list
 const sseClients = [];
 
-const getFullImageUrl = (imagePath) => {
+const getFullImageUrl = (imagePath, req) => {
   if (!imagePath) return null;
-  return imagePath.startsWith("http") ? imagePath : `http://localhost:5000${imagePath}`;
+  if (imagePath.startsWith("http")) return imagePath;
+  
+  // Use environment variable for base URL or construct from request
+  const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get("host")}`;
+  return `${baseUrl}${imagePath}`;
 };
 
 const broadcastCourseEvent = (event, payload) => {
@@ -42,7 +46,7 @@ export const createCourse = async (req, res) => {
 
     await course.save();
     const courseObj = course.toObject();
-    courseObj.image = getFullImageUrl(courseObj.image);
+    courseObj.image = getFullImageUrl(courseObj.image, req);
 
     // broadcast create
     broadcastCourseEvent("create", courseObj);
@@ -68,7 +72,7 @@ export const getAllCourses = async (req, res) => {
     // Convert relative paths to absolute URLs
     const coursesWithFullUrls = courses.map((course) => ({
       ...course.toObject(),
-      image: getFullImageUrl(course.image),
+      image: getFullImageUrl(course.image, req),
     }));
 
     res.json(coursesWithFullUrls);
@@ -117,7 +121,7 @@ export const updateCourse = async (req, res) => {
     }
 
     const courseObj = updatedCourse.toObject();
-    courseObj.image = getFullImageUrl(courseObj.image);
+    courseObj.image = getFullImageUrl(courseObj.image, req);
 
     // broadcast update
     broadcastCourseEvent("update", courseObj);

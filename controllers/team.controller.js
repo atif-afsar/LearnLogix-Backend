@@ -16,7 +16,9 @@ export const addTeamMember = async (req, res) => {
       return res.status(400).json({ message: "Name and role are required" });
     }
 
-    const imageUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+    // Use environment variable for base URL or construct from request
+    const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get("host")}`;
+    const imageUrl = `${baseUrl}/uploads/${req.file.filename}`;
 
     const member = new Team({
       name,
@@ -62,11 +64,12 @@ export const getTeamMembers = async (req, res) => {
     });
 
     // Convert relative paths to absolute URLs
+    const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get("host")}`;
     const membersWithFullUrls = members.map(member => ({
       ...member.toObject(),
       image: member.image.startsWith('http') 
         ? member.image 
-        : `http://localhost:5000${member.image}`
+        : `${baseUrl}${member.image}`
     }));
 
     res.json(membersWithFullUrls);
