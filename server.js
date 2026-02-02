@@ -3,7 +3,6 @@ import cors from "cors";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
-import contactRoutes from "./routes/contact.routes.js";
 import courseRoutes from "./routes/course.route.js";
 import adminRoutes from "./routes/admin.routes.js";
 import teamRoutes from "./routes/team.route.js";
@@ -19,10 +18,18 @@ const app = express();
 connectDB();
 
 app.use(cors({
-  origin: ["http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173", "https://learnlogix.vercel.app"],
+  origin: [
+    "http://localhost:5173", 
+    "http://localhost:3000", 
+    "http://127.0.0.1:5173", 
+    "https://learnlogix.vercel.app",
+    "https://www.learnlogix.com",
+    "https://learnlogix.com"
+  ],
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"]
+  allowedHeaders: ["Content-Type", "Authorization"],
+  optionsSuccessStatus: 200
 }));
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
@@ -37,8 +44,15 @@ app.get("/", (req, res) => {
   });
 });
 
+// Quick test endpoint
+app.get("/api/ping", (req, res) => {
+  res.json({ 
+    message: "pong", 
+    timestamp: new Date().toISOString() 
+  });
+});
+
 app.use("/api/admin", adminRoutes);
-app.use("/api/contact", contactRoutes);
 app.use("/api/courses", courseRoutes);
 app.use("/api/team", teamRoutes);
 app.get("/test", (req, res) => {
