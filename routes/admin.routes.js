@@ -20,7 +20,7 @@ router.get("/me", adminAuth, (req, res) => {
 });
 
 router.post("/courses", adminAuth, upload.single("image"), createCourse);
-router.put("/courses/:id", adminAuth, updateCourse); // ✅ EDIT COURSE
+router.put("/courses/:id", adminAuth, upload.single("image"), updateCourse); // ✅ EDIT COURSE with image support
 router.delete("/courses/:id", adminAuth, deleteCourse);
 
 

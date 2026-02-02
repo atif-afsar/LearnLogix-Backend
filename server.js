@@ -2,10 +2,12 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import path from "path";
+import multer from "multer";
 import { fileURLToPath } from "url";
 import courseRoutes from "./routes/course.route.js";
 import adminRoutes from "./routes/admin.routes.js";
 import teamRoutes from "./routes/team.route.js";
+import { upload } from "./middleware/upload.js";
 import connectDB from "./db/connectDB.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -17,20 +19,15 @@ const app = express();
 
 connectDB();
 
+// Simple CORS configuration - allow all origins for local testing
 app.use(cors({
-  origin: [
-    "http://localhost:5173", 
-    "http://localhost:3000", 
-    "http://127.0.0.1:5173", 
-    "https://learnlogix.vercel.app",
-    "https://www.learnlogix.com",
-    "https://learnlogix.com"
-  ],
+  origin: true,
   credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
   optionsSuccessStatus: 200
 }));
+
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
@@ -52,18 +49,44 @@ app.get("/api/ping", (req, res) => {
   });
 });
 
+// Debug endpoint to check CORS
+app.get("/api/cors-test", (req, res) => {
+  res.json({ 
+    message: "CORS is working", 
+    origin: req.headers.origin,
+    timestamp: new Date().toISOString() 
+  });
+});
+
 app.use("/api/admin", adminRoutes);
 app.use("/api/courses", courseRoutes);
 app.use("/api/team", teamRoutes);
+
 app.get("/test", (req, res) => {
   res.json({ message: "Server is alive!" });
 });
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  console.error("Error occurred:", err.stack);
+  
+  // Handle multer errors specifically
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ message: "File too large. Maximum size is 8MB." });
+    }
+    if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+      return res.status(400).json({ message: "Unexpected file field. Expected 'image'." });
+    }
+    return res.status(400).json({ message: `Upload error: ${err.message}` });
+  }
+  
+  // Handle other errors
+  if (err.message === "Only image files are allowed") {
+    return res.status(400).json({ message: "Only image files are allowed" });
+  }
+  
   res.status(500).json({ message: "Something went wrong!" });
 });
 
 export default app;
-   

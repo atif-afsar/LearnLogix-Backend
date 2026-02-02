@@ -2,6 +2,46 @@
 // ADMIN: Add team member
 import Team from "../models/Team.model.js";
 
+// Helper function for consistent image URL handling
+const getFullImageUrl = (imagePath, req) => {
+  if (!imagePath) return null;
+  
+  // If it's a production URL but we're in development, convert to local URL
+  if (process.env.NODE_ENV !== 'production' && imagePath.includes('learnlogix-backend.onrender.com')) {
+    const filename = imagePath.split('/uploads/')[1];
+    if (filename) {
+      const protocol = req.protocol || 'https';
+      const host = req.get("host") || 'learnlogix-backend.onrender.com';
+      const localUrl = `${protocol}://${host}/uploads/${filename}`;
+      return localUrl;
+    }
+  }
+  
+  // If already a full URL, return as-is
+  if (imagePath.startsWith("http")) {
+    return imagePath;
+  }
+  
+  // For backend uploads (/uploads/*), prepend backend URL
+  if (imagePath.startsWith("/uploads/")) {
+    // In development, use request host or fallback to production URL
+    if (process.env.NODE_ENV !== 'production') {
+      const protocol = req.protocol || 'https';
+      const host = req.get("host") || 'learnlogix-backend.onrender.com';
+      const fullUrl = `${protocol}://${host}${imagePath}`;
+      return fullUrl;
+    }
+    
+    // In production, use BASE_URL if available, otherwise construct from request
+    const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get("host")}`;
+    const fullUrl = `${baseUrl}${imagePath}`;
+    return fullUrl;
+  }
+  
+  // Default: return as-is
+  return imagePath;
+};
+
 // ADMIN: Add team member
 export const addTeamMember = async (req, res) => {
   try {
@@ -16,9 +56,8 @@ export const addTeamMember = async (req, res) => {
       return res.status(400).json({ message: "Name and role are required" });
     }
 
-    // Use environment variable for base URL or construct from request
-    const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get("host")}`;
-    const imageUrl = `${baseUrl}/uploads/${req.file.filename}`;
+    // Store relative path, convert to full URL when serving
+    const imageUrl = `/uploads/${req.file.filename}`;
 
     const member = new Team({
       name,
@@ -28,9 +67,13 @@ export const addTeamMember = async (req, res) => {
 
     await member.save();
 
+    // Convert to full URL for response
+    const memberObj = member.toObject();
+    memberObj.image = getFullImageUrl(memberObj.image, req);
+
     res.status(201).json({
       message: "Team member added",
-      member,
+      member: memberObj,
     });
   } catch (error) {
     console.error(error);
@@ -63,13 +106,10 @@ export const getTeamMembers = async (req, res) => {
       createdAt: -1,
     });
 
-    // Convert relative paths to absolute URLs
-    const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get("host")}`;
+    // Convert relative paths to absolute URLs using consistent helper
     const membersWithFullUrls = members.map(member => ({
       ...member.toObject(),
-      image: member.image.startsWith('http') 
-        ? member.image 
-        : `${baseUrl}${member.image}`
+      image: getFullImageUrl(member.image, req),
     }));
 
     res.json(membersWithFullUrls);

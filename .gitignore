@@ -11,3 +11,4 @@ yarn-error.log*
 .pnp.js
 scripts/createAdmin.js
 uploads/
+!uploads/.gitkeep

@@ -5,11 +5,47 @@ const sseClients = [];
 
 const getFullImageUrl = (imagePath, req) => {
   if (!imagePath) return null;
-  if (imagePath.startsWith("http")) return imagePath;
   
-  // Use environment variable for base URL or construct from request
-  const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get("host")}`;
-  return `${baseUrl}${imagePath}`;
+  // If it's a production URL but we're in development, convert to local URL
+  if (process.env.NODE_ENV !== 'production' && imagePath.includes('learnlogix-backend.onrender.com')) {
+    const filename = imagePath.split('/uploads/')[1];
+    if (filename) {
+      const protocol = req.protocol || 'https';
+      const host = req.get("host") || 'learnlogix-backend.onrender.com';
+      const localUrl = `${protocol}://${host}/uploads/${filename}`;
+      return localUrl;
+    }
+  }
+  
+  // If already a full URL, return as-is
+  if (imagePath.startsWith("http")) {
+    return imagePath;
+  }
+  
+  // For static frontend images (/images/*), return as-is
+  // These will be served by the frontend
+  if (imagePath.startsWith("/images/")) {
+    return imagePath;
+  }
+  
+  // For backend uploads (/uploads/*), prepend backend URL
+  if (imagePath.startsWith("/uploads/")) {
+    // In development, use request host or fallback to production URL
+    if (process.env.NODE_ENV !== 'production') {
+      const protocol = req.protocol || 'https';
+      const host = req.get("host") || 'learnlogix-backend.onrender.com';
+      const fullUrl = `${protocol}://${host}${imagePath}`;
+      return fullUrl;
+    }
+    
+    // In production, use BASE_URL if available, otherwise construct from request
+    const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get("host")}`;
+    const fullUrl = `${baseUrl}${imagePath}`;
+    return fullUrl;
+  }
+  
+  // Default: return as-is
+  return imagePath;
 };
 
 const broadcastCourseEvent = (event, payload) => {
@@ -69,7 +105,7 @@ export const getAllCourses = async (req, res) => {
       createdAt: -1,
     });
 
-    // Convert relative paths to absolute URLs
+    // Convert relative paths to absolute URLs for proper serving
     const coursesWithFullUrls = courses.map((course) => ({
       ...course.toObject(),
       image: getFullImageUrl(course.image, req),
@@ -110,9 +146,17 @@ export const updateCourse = async (req, res) => {
     const { id } = req.params;
     const { title, description, price } = req.body;
 
+    // Prepare update data
+    const updateData = { title, description, price };
+    
+    // If new image is uploaded, add it to update data
+    if (req.file) {
+      updateData.image = `/uploads/${req.file.filename}`;
+    }
+
     const updatedCourse = await Course.findByIdAndUpdate(
       id,
-      { title, description, price },
+      updateData,
       { new: true, runValidators: true }
     );
 
