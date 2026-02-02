@@ -1,7 +1,5 @@
 import { Resend } from "resend";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 export const sendContactMessage = async (req, res) => {
   try {
     const { name, email, program = "Not specified", message } = req.body;
@@ -20,6 +18,9 @@ export const sendContactMessage = async (req, res) => {
         message: "Email service not configured",
       });
     }
+
+    // Initialize Resend with API key inside the function
+    const resend = new Resend(process.env.RESEND_API_KEY);
 
     const result = await resend.emails.send({
       from: "LearnLogix <onboarding@resend.dev>",
