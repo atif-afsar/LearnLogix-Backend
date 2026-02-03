@@ -30,7 +30,7 @@ app.use(cors({
 
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+// Static file serving for uploads removed - images are now stored in Cloudinary
 
 // Health check endpoint
 app.get("/", (req, res) => {

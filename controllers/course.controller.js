@@ -1,52 +1,9 @@
 import Course from "../models/Course.model.js";
+import { processImageUpload } from "../utils/uploadHelper.js";
+import { deleteFromCloudinary } from "../utils/cloudinary.js";
 
 // Simple in-memory SSE clients list
 const sseClients = [];
-
-const getFullImageUrl = (imagePath, req) => {
-  if (!imagePath) return null;
-  
-  // If it's a production URL but we're in development, convert to local URL
-  if (process.env.NODE_ENV !== 'production' && imagePath.includes('learnlogix-backend.onrender.com')) {
-    const filename = imagePath.split('/uploads/')[1];
-    if (filename) {
-      const protocol = req.protocol || 'https';
-      const host = req.get("host") || 'learnlogix-backend.onrender.com';
-      const localUrl = `${protocol}://${host}/uploads/${filename}`;
-      return localUrl;
-    }
-  }
-  
-  // If already a full URL, return as-is
-  if (imagePath.startsWith("http")) {
-    return imagePath;
-  }
-  
-  // For static frontend images (/images/*), return as-is
-  // These will be served by the frontend
-  if (imagePath.startsWith("/images/")) {
-    return imagePath;
-  }
-  
-  // For backend uploads (/uploads/*), prepend backend URL
-  if (imagePath.startsWith("/uploads/")) {
-    // In development, use request host or fallback to production URL
-    if (process.env.NODE_ENV !== 'production') {
-      const protocol = req.protocol || 'https';
-      const host = req.get("host") || 'learnlogix-backend.onrender.com';
-      const fullUrl = `${protocol}://${host}${imagePath}`;
-      return fullUrl;
-    }
-    
-    // In production, use BASE_URL if available, otherwise construct from request
-    const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get("host")}`;
-    const fullUrl = `${baseUrl}${imagePath}`;
-    return fullUrl;
-  }
-  
-  // Default: return as-is
-  return imagePath;
-};
 
 const broadcastCourseEvent = (event, payload) => {
   const data = JSON.stringify(payload);
@@ -71,7 +28,18 @@ export const createCourse = async (req, res) => {
       return res.status(400).json({ message: "All fields are required and price must be a number" });
     }
 
-    const imageUrl = req.file ? `/uploads/${req.file.filename}` : null;
+    // Upload image to Cloudinary if provided
+    let imageUrl = null;
+    if (req.file) {
+      try {
+        imageUrl = await processImageUpload(req.file, 'courses');
+      } catch (uploadError) {
+        console.error("Image upload error:", uploadError);
+        return res.status(400).json({ 
+          message: uploadError.message || "Failed to upload image" 
+        });
+      }
+    }
 
     const course = new Course({
       title,
@@ -82,7 +50,6 @@ export const createCourse = async (req, res) => {
 
     await course.save();
     const courseObj = course.toObject();
-    courseObj.image = getFullImageUrl(courseObj.image, req);
 
     // broadcast create
     broadcastCourseEvent("create", courseObj);
@@ -105,13 +72,10 @@ export const getAllCourses = async (req, res) => {
       createdAt: -1,
     });
 
-    // Convert relative paths to absolute URLs for proper serving
-    const coursesWithFullUrls = courses.map((course) => ({
-      ...course.toObject(),
-      image: getFullImageUrl(course.image, req),
-    }));
+    // Cloudinary URLs are already full URLs, no conversion needed
+    const coursesList = courses.map((course) => course.toObject());
 
-    res.json(coursesWithFullUrls);
+    res.json(coursesList);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server error" });
@@ -122,11 +86,19 @@ export const deleteCourse = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const course = await Course.findByIdAndDelete(id);
+    const course = await Course.findById(id);
 
     if (!course) {
       return res.status(404).json({ message: "Course not found" });
     }
+
+    // Delete image from Cloudinary if it exists
+    if (course.image) {
+      await deleteFromCloudinary(course.image);
+    }
+
+    // Delete course from database
+    await Course.findByIdAndDelete(id);
 
     // broadcast delete event
     broadcastCourseEvent("delete", { id });
@@ -146,12 +118,31 @@ export const updateCourse = async (req, res) => {
     const { id } = req.params;
     const { title, description, price } = req.body;
 
+    // Get existing course to check for old image
+    const existingCourse = await Course.findById(id);
+    if (!existingCourse) {
+      return res.status(404).json({ message: "Course not found" });
+    }
+
     // Prepare update data
     const updateData = { title, description, price };
     
-    // If new image is uploaded, add it to update data
+    // If new image is uploaded, upload to Cloudinary and delete old image
     if (req.file) {
-      updateData.image = `/uploads/${req.file.filename}`;
+      try {
+        const newImageUrl = await processImageUpload(req.file, 'courses');
+        updateData.image = newImageUrl;
+
+        // Delete old image from Cloudinary if it exists
+        if (existingCourse.image) {
+          await deleteFromCloudinary(existingCourse.image);
+        }
+      } catch (uploadError) {
+        console.error("Image upload error:", uploadError);
+        return res.status(400).json({ 
+          message: uploadError.message || "Failed to upload image" 
+        });
+      }
     }
 
     const updatedCourse = await Course.findByIdAndUpdate(
@@ -160,12 +151,7 @@ export const updateCourse = async (req, res) => {
       { new: true, runValidators: true }
     );
 
-    if (!updatedCourse) {
-      return res.status(404).json({ message: "Course not found" });
-    }
-
     const courseObj = updatedCourse.toObject();
-    courseObj.image = getFullImageUrl(courseObj.image, req);
 
     // broadcast update
     broadcastCourseEvent("update", courseObj);

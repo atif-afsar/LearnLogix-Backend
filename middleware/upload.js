@@ -1,36 +1,18 @@
 // middleware/upload.js
 import multer from "multer";
-import path from "path";
-import fs from "fs";
-import { fileURLToPath } from "url";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-// Ensure uploads directory exists
-const uploadsDir = path.join(__dirname, "../uploads");
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    // Ensure uploads directory exists relative to project root
-    const uploadsPath = path.join(__dirname, "../uploads");
-    cb(null, uploadsPath);
-  },
-  filename: (req, file, cb) => {
-    // Use timestamp + original filename to prevent conflicts
-    const uniqueName = Date.now() + "-" + file.originalname.replace(/\s+/g, '-');
-    cb(null, uniqueName);
-  },
-});
+// Use memory storage instead of disk storage
+// Files will be stored in memory as buffers and uploaded directly to Cloudinary
+const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
-  // Only allow image files
-  if (file.mimetype && file.mimetype.startsWith("image/")) {
+  // Only allow specific image file types
+  const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+  
+  if (file.mimetype && allowedMimeTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error("Only image files are allowed"), false);
+    cb(new Error("Only image files (JPEG, JPG, PNG, WebP) are allowed"), false);
   }
 };
 
