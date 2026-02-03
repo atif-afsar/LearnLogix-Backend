@@ -9,11 +9,20 @@ import adminRoutes from "./routes/admin.routes.js";
 import teamRoutes from "./routes/team.route.js";
 import { upload } from "./middleware/upload.js";
 import connectDB from "./db/connectDB.js";
+import { configureCloudinary } from "./utils/cloudinary.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Load environment variables first
 dotenv.config({ path: path.join(__dirname, '.env') });
+
+// Initialize Cloudinary configuration after env vars are loaded
+try {
+  configureCloudinary();
+} catch (error) {
+  console.error('⚠️  Cloudinary configuration warning:', error.message);
+  console.log('   Cloudinary will be configured when first used (if env vars are set)');
+}
 
 const app = express();
 

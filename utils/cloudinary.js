@@ -1,19 +1,42 @@
 import { v2 as cloudinary } from 'cloudinary';
-import dotenv from 'dotenv';
-import path from 'path';
-import { fileURLToPath } from 'url';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Track if Cloudinary has been configured
+let isConfigured = false;
 
-// Load environment variables
-dotenv.config({ path: path.join(__dirname, '../.env') });
+// Configure Cloudinary - environment variables should be loaded by server.js
+// This function ensures Cloudinary is configured before use
+const configureCloudinary = () => {
+  // If already configured, skip
+  if (isConfigured) {
+    return;
+  }
 
-// Configure Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+  const apiKey = process.env.CLOUDINARY_API_KEY;
+  const apiSecret = process.env.CLOUDINARY_API_SECRET;
+
+  // Validate that all required environment variables are present
+  if (!cloudName || !apiKey || !apiSecret) {
+    const missing = [];
+    if (!cloudName) missing.push('CLOUDINARY_CLOUD_NAME');
+    if (!apiKey) missing.push('CLOUDINARY_API_KEY');
+    if (!apiSecret) missing.push('CLOUDINARY_API_SECRET');
+    
+    throw new Error(
+      `Cloudinary configuration error: Missing required environment variables: ${missing.join(', ')}. ` +
+      `Please set these in your deployment platform's environment variables.`
+    );
+  }
+
+  cloudinary.config({
+    cloud_name: cloudName,
+    api_key: apiKey,
+    api_secret: apiSecret,
+  });
+
+  isConfigured = true;
+  console.log('✅ Cloudinary configured successfully');
+};
 
 /**
  * Upload image buffer to Cloudinary
@@ -23,6 +46,9 @@ cloudinary.config({
  * @returns {Promise<{secure_url: string, public_id: string}>}
  */
 export const uploadToCloudinary = async (imageBuffer, folder = 'learnlogix', publicId = null) => {
+  // Ensure Cloudinary is configured before uploading
+  configureCloudinary();
+
   return new Promise((resolve, reject) => {
     const uploadOptions = {
       folder: folder,
@@ -65,6 +91,9 @@ export const uploadToCloudinary = async (imageBuffer, folder = 'learnlogix', pub
  */
 export const deleteFromCloudinary = async (imageUrl) => {
   try {
+    // Ensure Cloudinary is configured
+    configureCloudinary();
+
     if (!imageUrl || !imageUrl.includes('cloudinary.com')) {
       return;
     }
@@ -84,5 +113,8 @@ export const deleteFromCloudinary = async (imageUrl) => {
     // Don't throw - deletion failures shouldn't break the flow
   }
 };
+
+// Export configuration function for explicit initialization
+export { configureCloudinary };
 
 export default cloudinary;
